@@ -42,17 +42,17 @@ do
     if [ $i == 35 ]
     then
         source /root/anaconda2/envs/tensorflow/bin/activate
-        python /root/DMLcode/example.py $ps $worker --job_name=ps --task_index=0
+        python /root/DMLcode/disDNN.py $ps $worker --job_name=ps --task_index=0
     else
 	ssh ssd$i "source activate tensorflow"
         n=`expr 35 - $1`
         if [ $i -gt $n ]
         then
             index=`expr 35 - $i`
-            ssh ssd$i python /root/DMLcode/example.py $ps $worker --job_name=ps --task_index=$index
+            ssh ssd$i python /root/DMLcode/disDNN.py $ps $worker --job_name=ps --task_index=$index
         else
             index=`expr 35 - $1 - $i`
-            ssh ssd$i python /root/DMLcode/example.py $ps $worker --job_name=worker --task_index=$index --targted_accuracy=$4 --optimizer=$3 >> /root/DMLcode/result/$6
+            ssh ssd$i python /root/DMLcode/disDNN.py $ps $worker --job_name=worker --task_index=$index --targted_accuracy=$4 --optimizer=$3 >> /root/DMLcode/result/$6
             echo "worker"$index" complated"
 	fi
     fi
