@@ -87,7 +87,9 @@ elif FLAGS.job_name == "worker":
 	    # target 10 output classes
 	    y_ = tf.placeholder(tf.float32, shape=[None, 10], name="y-input")
 
-	    # model parameters will change during training so we use tf.Variable
+	with tf.name_scope('write_file'):
+	    content = tf.placeholder(tf.string)
+	    writer = tf.write_file("ex_re.csv", content)
 	tf.set_random_seed(1)
 
 	# Build the graph for the DNN
@@ -147,7 +149,6 @@ elif FLAGS.job_name == "worker":
 	final_accuracy = 0
 	begin_time = time.time()
 	batch_count = int(mnist.train.num_examples/batch_size)
-	count = 0
 	for i in range(batch_count*10):
 	    batch_x, batch_y = mnist.train.next_batch(batch_size)
 				
@@ -157,17 +158,14 @@ elif FLAGS.job_name == "worker":
 	    if (final_accuracy > targted_accuracy):
 		break
 	    #writer.add_summary(summary, step)
-
-	    count += 1
-	    if count % frequency == 0 or (i+1) % batch_count == 0:
-		print("Step: %d," % (step+1), 
+	    print("Step: %d," % (step+1), 
 			" Accuracy: %.4f," % sess.run(accuracy, feed_dict = {x: mnist.validation.images, y_: mnist.validation.labels, keep_prob: 1.0}), 
 			" Batch: %3d of %3d," % (i+1, batch_count), 
 			" Cost: %.4f," % cost, 
-			" AvgTime: %3.2fms" % float(elapsed_time*1000/frequency))
-		    
-	    count = 0
-	print(str(n_PS) + '-' + str(n_Workers) + '-' + str(FLAGS.task_index) + ',' + str(step) + ',' + str(float(time.time()-begin_time)) + ',' + str(cost) + ',' + str(final_accuracy))
+			" Time: %3.2fms" % float(time.time()-begin_time))
+	#index, sum_step, total_time, cost, final_accuracy
+	re = str(n_PS) + '-' + str(n_Workers) + '-' + str(FLAGS.task_index) + ',' + str(step) + ',' + str(float(time.time()-begin_time)) + ',' + str(cost) + ',' + str(final_accuracy)
+	sess.run(writer, feed_dict = {content: re})
 	
 	'''
 	print("sum_step: %2.2f" % step)
