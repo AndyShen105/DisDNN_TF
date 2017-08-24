@@ -52,7 +52,7 @@ do
             ssh ssd$i python /root/DMLcode/disDNN.py $ps $worker --job_name=ps --task_index=$index
         else
             index=`expr 35 - $1 - $i`
-            ssh ssd$i python /root/DMLcode/disDNN.py $ps $worker --job_name=worker --task_index=$index --targted_accuracy=$4 --optimizer=$3 >> /root/DMLcode/result/$6
+            ssh ssd$i python /root/DMLcode/disDNN.py $ps $worker --job_name=worker --task_index=$index --targted_accuracy=$4 --optimizer=$3 #>> /root/DMLcode/result/$6
             echo "worker"$index" complated"
 	fi
     fi

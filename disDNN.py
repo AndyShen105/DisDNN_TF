@@ -13,6 +13,7 @@ import tensorflow as tf
 import sys
 import time
 import os
+from DNNmodel import DNN
 
 #get the optimizer
 def get_optimizer(optimizer, learning_rate):
@@ -78,6 +79,7 @@ elif FLAGS.job_name == "worker":
 		cluster=cluster)):
 	# count the number of updates
 	global_step = tf.get_variable('global_step',[],initializer = tf.constant_initializer(0),trainable = False)
+	
 	# input images
 	with tf.name_scope('input'):
 	# None -> batch size can be any size, 784 -> flattened mnist image
@@ -87,48 +89,26 @@ elif FLAGS.job_name == "worker":
 
 	    # model parameters will change during training so we use tf.Variable
 	tf.set_random_seed(1)
-	with tf.name_scope("weights"):
-	    W1 = tf.Variable(tf.random_normal([784, 100]))
-	    W2 = tf.Variable(tf.random_normal([100, 50]))
-	    W3 = tf.Variable(tf.random_normal([50, 25]))
-	    W4 = tf.Variable(tf.random_normal([25, 10]))
 
-	# bias
-	with tf.name_scope("biases"):
-	    b1 = tf.Variable(tf.zeros([100]))
-	    b2 = tf.Variable(tf.zeros([50]))
-	    b3 = tf.Variable(tf.zeros([25]))
-	    b4 = tf.Variable(tf.zeros([10]))	
-	# implement model
-	with tf.name_scope("softmax"):
-	    # y is our prediction
-	    z2 = tf.add(tf.matmul(x, W1), b1)
-	    a2 = tf.nn.sigmoid(z2)
-	    z3 = tf.add(tf.matmul(a2, W2), b2)
-	    a3 = tf.nn.sigmoid(z3)
-	    z4 = tf.add(tf.matmul(a3, W3), b3)
-	    a4 = tf.nn.sigmoid(z4)
-	    z5 = tf.add(tf.matmul(a4, W4), b4)
-	    y  = tf.nn.softmax(z5)
-
+	# Build the graph for the DNN
+	y_con,keep_prob = DNN(x)
+	
 	# specify cost function
 	with tf.name_scope('cross_entropy'):
-	# this is our cost
-	    cross_entropy = tf.reduce_mean(-tf.reduce_sum(y_ * tf.log(y), reduction_indices=[1]))
+	    cross_entropy = tf.reduce_mean(tf.nn.softmax_cross_entropy_with_logits(labels=y_, logits=y_con))
+	
 	# specify optimizer
 	with tf.name_scope('train'):
-	    # optimizer is an "operation" which we can execute in a session
 	    grad_op = get_optimizer( Optimizer, learning_rate)
 	    train_op = grad_op.minimize(cross_entropy, global_step=global_step)
-		
-	#changed by andy
+	
 	#init_token_op = grad_op.get_init_tokens_op()
 	#chief_queue_runner = rep_op.get_chief_queue_runner()
 	#changed by andy
 	
 	with tf.name_scope('Accuracy'):
 	# accuracy
-	    correct_prediction = tf.equal(tf.argmax(y,1), tf.argmax(y_,1))
+	    correct_prediction = tf.equal(tf.argmax(y_con,1), tf.argmax(y_,1))
 	    accuracy = tf.reduce_mean(tf.cast(correct_prediction, tf.float32))
 
 	# create a summary for our cost and accuracy
@@ -166,32 +146,27 @@ elif FLAGS.job_name == "worker":
 	step = 0
 	final_accuracy = 0
 	begin_time = time.time()
-	while( final_accuracy < targted_accuracy ):
-	    # number of batches in one epoch
-	    batch_count = int(mnist.train.num_examples/batch_size)
-	    count = 0
-	    for i in range(batch_count):
-		batch_x, batch_y = mnist.train.next_batch(batch_size)
+	batch_count = int(mnist.train.num_examples/batch_size)
+	count = 0
+	for i in range(batch_count*10):
+	    batch_x, batch_y = mnist.train.next_batch(batch_size)
 				
-		# perform the operations we defined earlier on batch
-		_, cost, summary, step = sess.run([train_op, cross_entropy, summary_op, global_step], feed_dict={x: batch_x, y_: batch_y})
-		final_accuracy = sess.run(accuracy, feed_dict = {x: mnist.test.images, y_: mnist.test.labels})
-		if (final_accuracy > targted_accuracy):
-		    break
-		#writer.add_summary(summary, step)
+	    # perform the operations we defined earlier on batch
+	    _, cost, summary, step = sess.run([train_op, cross_entropy, summary_op, global_step], feed_dict={x: batch_x, y_: batch_y, keep_prob: 0.5})
+	    final_accuracy = sess.run(accuracy, feed_dict = {x: mnist.test.images, y_: mnist.test.labels, keep_prob: 1.0})
+	    if (final_accuracy > targted_accuracy):
+		break
+	    #writer.add_summary(summary, step)
 
-		count += 1
-	    	if count % frequency == 0 or i+1 == batch_count:
-		    elapsed_time = time.time() - start_time
-		    start_time = time.time()
-		    '''
-		    print("Step: %d," % (step+1), 
-			  " Accuracy: %.4f," % final_accuracy, 
-			  " Batch: %3d of %3d," % (i+1, batch_count), 
-			  " Cost: %.4f," % cost, 
-			  " AvgTime: %3.2fms" % float(elapsed_time*1000/frequency))
-		    '''
-		    count = 0
+	    count += 1
+	    if count % frequency == 0 or (i+1) % batch_count == 0:
+		print("Step: %d," % (step+1), 
+			" Accuracy: %.4f," % sess.run(accuracy, feed_dict = {x: mnist.validation.images, y_: mnist.validation.labels, keep_prob: 1.0}), 
+			" Batch: %3d of %3d," % (i+1, batch_count), 
+			" Cost: %.4f," % cost, 
+			" AvgTime: %3.2fms" % float(elapsed_time*1000/frequency))
+		    
+	    count = 0
 	print(str(n_PS) + '-' + str(n_Workers) + '-' + str(FLAGS.task_index) + ',' + str(step) + ',' + str(float(time.time()-begin_time)) + ',' + str(cost) + ',' + str(final_accuracy))
 	
 	'''
