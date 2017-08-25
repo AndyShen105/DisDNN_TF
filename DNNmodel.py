@@ -1,3 +1,4 @@
+#-*-coding:UTF-8-*-
 import argparse
 import sys
 import tempfile
@@ -33,7 +34,7 @@ def DNN(x):
 
   # Second convolutional layer -- maps 10 feature maps to 20.
   with tf.name_scope('conv2'):
-    W_conv2 = weight_variable([5, 5, 5, 20])
+    W_conv2 = weight_variable([5, 5, 10, 20])
     b_conv2 = bias_variable([20])
     h_conv2 = tf.nn.relu(conv2d(h_pool1, W_conv2) + b_conv2)
 
@@ -51,7 +52,7 @@ def DNN(x):
     h_fc1 = tf.nn.relu(tf.matmul(h_pool2_flat, W_fc1) + b_fc1)
   
   #maps -- maps 400 to 400 features
-  with tf.name_scope(‘fc2’):
+  with tf.name_scope('fc2'):
     W_fc2 = weight_variable([400, 400])
     b_fc2 = bias_variable([400])
 
