@@ -1,12 +1,4 @@
 #-*-coding:UTF-8-*-
-'''
-Distributed Tensorflow 1.2.0 example of using data parallelism and share model parameters.
-Trains a simple sigmoid neural network on mnist for 20 epochs on three machines using one parameter server. 
-
-Change the hardcoded host urls below with your own hosts. 
-Run like this: 
-'''
-
 from __future__ import print_function
 
 import tensorflow as tf
@@ -38,8 +30,10 @@ os.environ['GRPC_VERBOSITY_LEVEL']='DEBUG'
 # cluster specification
 parameter_servers = sys.argv[1].split(',')
 n_PS = len(parameter_servers)
+#print(parameter_servers);
 workers = sys.argv[2].split(',')
 n_Workers = len(workers)
+#print(workers);
 cluster = tf.train.ClusterSpec({"ps":parameter_servers, "worker":workers})
 
 # input flags
@@ -56,26 +50,28 @@ server = tf.train.Server(
     task_index=FLAGS.task_index)
 	
 # config
-batch_size = 50
-learning_rate = 0.0001
+batch_size = 100
+learning_rate = 0.0005
 logs_path = "/tmp/mnist/1"
 targted_accuracy = FLAGS.targted_accuracy
 Optimizer = FLAGS.optimizer
 
 # load mnist data set
 from tensorflow.examples.tutorials.mnist import input_data
-mnist = input_data.read_data_sets('/root/code/disDNN/MNIST_data', one_hot=True)
+mnist = input_data.read_data_sets('/root/DMLcode/MNIST_data', one_hot=True)
 
 if FLAGS.job_name == "ps":
+#    print ("Launching a parameter server\n")
     server.join()
 elif FLAGS.job_name == "worker":
+#    print ("Launching a worker\n")
     # Between-graph replication
     with tf.device(tf.train.replica_device_setter(
 		worker_device="/job:worker/task:%d" % FLAGS.task_index,
 		cluster=cluster)):
 	# count the number of updates
+	global_step = tf.get_variable('global_step',[],initializer = tf.constant_initializer(0),trainable = False)
 	
-	global_step = tf.contrib.framework.get_or_create_global_step()
 	# input images
 	with tf.name_scope('input'):
 	# None -> batch size can be any size, 784 -> flattened mnist image
@@ -100,62 +96,52 @@ elif FLAGS.job_name == "worker":
 	    grad_op = get_optimizer( Optimizer, learning_rate)
 	    train_op = grad_op.minimize(cross_entropy, global_step=global_step)
 	
+	#init_token_op = grad_op.get_init_tokens_op()
+	#chief_queue_runner = rep_op.get_chief_queue_runner()
+	#changed by andy
+	
 	with tf.name_scope('Accuracy'):
 	# accuracy
 	    correct_prediction = tf.equal(tf.argmax(y_con,1), tf.argmax(y_,1))
-	    correct_prediction = tf.cast(correct_prediction, tf.float32)
-	accuracy = tf.reduce_mean(correct_prediction)
+	    accuracy = tf.reduce_mean(tf.cast(correct_prediction, tf.float32))
 
+	# create a summary for our cost and accuracy
 	init_op = tf.global_variables_initializer()
 	variables_check_op=tf.report_uninitialized_variables()
 
     sv = tf.train.Supervisor(is_chief=(FLAGS.task_index == 0),
-				global_step = global_step,
-				init_op = init_op)
+				global_step=global_step,
+				init_op=init_op)
     state = False
     frequency = 100
-    count = 0
     with sv.prepare_or_wait_for_session(server.target) as sess:
 	while(not state):
             uninitalized_variables=sess.run(variables_check_op)
 	    if(len(uninitalized_variables.shape) == 1):
 		state = True
 	# create log writer object (this will log on every machine)
+	#writer = tf.summary.FileWriter(logs_path, graph=tf.get_default_graph())
 	# perform training cycles
+	start_time = time.time()
 	step = 0
 	final_accuracy = 0
-	start_time = time.time()
+	begin_time = time.time()
 	batch_count = int(mnist.train.num_examples/batch_size)
-	for i in range(batch_count*20):
+	for i in range(batch_count*10):
 	    batch_x, batch_y = mnist.train.next_batch(batch_size)
-	    begin_time = time.time()
+				
 	    # perform the operations we defined earlier on batch
 	    _, cost, step = sess.run([train_op, cross_entropy, global_step], feed_dict={x: batch_x, y_: batch_y, keep_prob: 0.5})
 	    final_accuracy = sess.run(accuracy, feed_dict = {x: mnist.test.images, y_: mnist.test.labels, keep_prob: 1.0})
 	    if (final_accuracy > targted_accuracy):
 		break
-	    count += 1
-            if count % 1 == 0 or (i+1) % batch_count == 0:
-		elapsed_time = time.time() - start_time
-                start_time = time.time() 
-                print("Step: %d," % (step+1),
-				" Accuracy: %.4f," % final_accuracy, 
-                                " Batch: %3d of %3d," % (i+1, batch_count),
-                                " Cost: %.4f," % cost,
-                                " AvgTime: %3.2fms" % float(elapsed_time*1000))
-           	count = 0
-
+	    #writer.add_summary(summary, step)
+	    print("Step: %d," % (step+1), 
+			" Accuracy: %.4f," % sess.run(accuracy, feed_dict = {x: mnist.validation.images, y_: mnist.validation.labels, keep_prob: 1.0}), 
+			" Batch: %3d of %3d," % (i+1, batch_count), 
+			" Cost: %.4f," % cost, 
+			" Time: %3.2fms" % float(time.time()-begin_time))
 	#index, sum_step, total_time, cost, final_accuracy
 	re = str(n_PS) + '-' + str(n_Workers) + '-' + str(FLAGS.task_index) + ',' + str(step) + ',' + str(float(time.time()-begin_time)) + ',' + str(cost) + ',' + str(final_accuracy)
-	#sess.run(writer, feed_dict = {content: re})
-	writer = open("re.csv", "a+")
-	writer.write(re+"\r\n")
-	'''
-	print("sum_step: %2.2f" % step)
-	print("Total Time: %3.2fs" % float(time.time() - begin_time))
-	print("Final Cost: %.4f" % cost)
-	print("Final accuracy: %.4f" % final_accuracy)
-	'''
-
-    sv.stop()
-#    print("done")
+	sess.run(writer, feed_dict = {content: re})
+    sv.stop 
