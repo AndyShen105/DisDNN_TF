@@ -122,37 +122,34 @@ elif FLAGS.job_name == "worker":
 		state = True
 	# create log writer object (this will log on every machine)
 	# perform training cycles
-	start_time = time.time()
 	step = 0
 	final_accuracy = 0
-	begin_time = time.time()
+	start_time = time.time()
 	batch_count = int(mnist.train.num_examples/batch_size)
 	for i in range(batch_count*20):
 	    batch_x, batch_y = mnist.train.next_batch(batch_size)
+	    begin_time = time.time()
 	    # perform the operations we defined earlier on batch
 	    _, cost, step = sess.run([train_op, cross_entropy, global_step], feed_dict={x: batch_x, y_: batch_y, keep_prob: 0.5})
 	    final_accuracy = sess.run(accuracy, feed_dict = {x: mnist.test.images, y_: mnist.test.labels, keep_prob: 1.0})
 	    if (final_accuracy > targted_accuracy):
 		break
 	    count += 1
-	    print("Step: %d," % (step+1),
-                                " Accuracy: %.4f," % final_accuracy,
-                                " Batch: %3d of %3d," % (i+1, batch_count),
-                                " Cost: %.4f," % cost)
-            if count % 100 == 0 or (i+1) % batch_count == 0:
+            if count % 1 == 0 or (i+1) % batch_count == 0:
 		elapsed_time = time.time() - start_time
                 start_time = time.time() 
                 print("Step: %d," % (step+1),
 				" Accuracy: %.4f," % final_accuracy, 
                                 " Batch: %3d of %3d," % (i+1, batch_count),
                                 " Cost: %.4f," % cost,
-                                " AvgTime: %3.2fms" % float(elapsed_time*1000/frequency))
+                                " AvgTime: %3.2fms" % float(elapsed_time*1000))
            	count = 0
 
 	#index, sum_step, total_time, cost, final_accuracy
 	re = str(n_PS) + '-' + str(n_Workers) + '-' + str(FLAGS.task_index) + ',' + str(step) + ',' + str(float(time.time()-begin_time)) + ',' + str(cost) + ',' + str(final_accuracy)
-	sess.run(writer, feed_dict = {content: re})
-	
+	#sess.run(writer, feed_dict = {content: re})
+	writer = open("re.csv", "a+")
+	writer.write(re+"\r\n")
 	'''
 	print("sum_step: %2.2f" % step)
 	print("Total Time: %3.2fs" % float(time.time() - begin_time))
