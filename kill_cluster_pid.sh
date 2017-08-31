@@ -14,14 +14,9 @@ get_pid(){
 re=`ssh $1 "netstat -anp|grep "$2`
 tem=${re%%/*}
 pid=${tem##* }
-if [ "$pid" == "" ]
+if [ "$pid" != "" ]
 then
-    echo "the port:"$2" of "$1" is free"
-else
-    echo "the port:"$2" of "$1" has been occpuied by process："$pid
-    echo "kill pid:"$pid
     ssh $1 kill $pid
-    echo "clean"
 fi
 }
 

@@ -66,15 +66,15 @@ do
     fi
 }&
 done
-flag=0
+
 while true
 do
+    flag=0
     for(( i=0; i<$2; i++ ))
     do
     {   
 	tem=`cat temp$i`
 	flag=`expr $tem + $flag`
-	echo $flag
     }
     done	
     if [ $flag == $2 ]
