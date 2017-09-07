@@ -22,7 +22,7 @@ fi
 
 for((step=$1;step<=$2;step++));
 do
-    if [ $step == 35 ]
+    if [ $step == 42 ]
     then
 	re=`netstat -anp|grep $3`
 	tem=${re%%/*}

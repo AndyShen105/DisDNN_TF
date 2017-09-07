@@ -51,8 +51,7 @@ server = tf.train.Server(
 	
 # config
 batch_size = 100
-learning_rate = 0.0005
-logs_path = "/tmp/mnist/1"
+learning_rate = 0.0001
 targted_accuracy = FLAGS.targted_accuracy
 Optimizer = FLAGS.optimizer
 
@@ -68,13 +67,13 @@ elif FLAGS.job_name == "worker":
 	# count the number of updates
 	global_step = tf.get_variable('global_step',[],initializer = tf.constant_initializer(0),trainable = False)
 	# load mnist data set
-	mnist = input_data.read_data_sets('/root/DMLcode/MNIST_data', one_hot=True)
+	mnist = input_data.read_data_sets('./code/disDNN/MNIST_data', one_hot=True)
 	# input images
 	with tf.name_scope('input'):
-	# None -> batch size can be any size, 784 -> flattened mnist image
+	    # None -> batch size can be any size, 784 -> flattened mnist image
 	    x = tf.placeholder(tf.float32, shape=[None, 784], name="x-input")
 	    # target 10 output classes
-	    y_ = tf.placeholder(tf.float32, shape=[None, 10], name="y-input"
+	    y_ = tf.placeholder(tf.float32, shape=[None, 10], name="y-input")
 	# Build the graph for the DNN
 	y_conv,keep_prob = DNN(x)
 	# specify cost function
@@ -98,11 +97,8 @@ elif FLAGS.job_name == "worker":
         	allow_soft_placement=True,
         	log_device_placement=False,
         	device_filters=["/job:ps", "/job:worker/task:%d" % FLAGS.task_index])
-    sv = tf.train.Supervisor(is_chief=is_chief,																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																													
-                             logdir="train_logs",
-                             summary_op=summary_op,
-                             init_op=init_op,
-                             saver=saver,
+    sv = tf.train.Supervisor(is_chief=is_chief,
+			     saver=saver,
                              global_step=global_step,
                              save_model_secs=600)
     server_grpc_url = "grpc://" + workers[FLAGS.task_index]
@@ -114,22 +110,26 @@ elif FLAGS.job_name == "worker":
 		state = True
 	start_time = time.time()
 	step = 0
+	cost = 0
+	final_accuracy = 0
 	begin_time = time.time()
-	while (not sv.should_stop()) and (step < 5000):
+	while (not sv.should_stop()) and (step < 550):
 	    batch_x, batch_y = mnist.train.next_batch(batch_size)
-	    _, step = sess.run([train_op, cross_entropy, global_step], feed_dict={x: batch_x, y_: batch_y, keep_prob: 0.5})
-	    final_accuracy = sess.run(accuracy, feed_dict = {x: mnist.test.images, y_: mnist.test.labels, keep_prob: 1.0})
-	    if (final_accuracy > targted_accuracy):
-		break
-	    ‘’‘
+	    _, cost, step = sess.run([train_op, cross_entropy, global_step], feed_dict={x: batch_x, y_: batch_y, keep_prob: 0.5})
+	    #final_accuracy = sess.run(accuracy, feed_dict = {x: mnist.test.images, y_: mnist.test.labels, keep_prob: 1.0})
+	    #if (final_accuracy > targted_accuracy):
+	    #	break
 	    print("Step: %d," % (step+1), 
-			" Accuracy: %.4f," % sess.run(accuracy, feed_dict = {x: mnist.validation.images, y_: mnist.validation.labels, keep_prob: 1.0}), 
-			" Batch: %3d of %3d," % (i+1, batch_count), 
-			" Cost: %.4f," % cost, 
-			" Time: %3.2fms" % float(time.time()-begin_time))
+			" Accuracy: %.4f," % final_accuracy,
+			" Loss: %f" % cost,
+			" Time: %fs" % float(time.time()-begin_time))
 	    begin_time = time.time()
-	    ’‘’
+	    
 	#index, sum_step, total_time, cost, final_accuracy
-	re = str(n_PS) + '-' + str(n_Workers) + '-' + str(FLAGS.task_index) + ',' + str(step) + ',' + str(float(time.time()-begin_time)) + ',' + str(cost) + ',' + str(final_accuracy)
-	sess.run(writer, feed_dict = {content: re})
+	    
+	final_accuracy = sess.run(accuracy, feed_dict = {x: mnist.test.images, y_: mnist.test.labels, keep_prob: 1.0})
+	re = str(n_PS) + '-' + str(n_Workers) + '-' + str(FLAGS.task_index) + ',' + str(step) + ',' + str(float(time.time()-start_time)) + ',' + str(cost) + ',' + str(final_accuracy)
+        writer = open("re_2_"+Optimizer+".csv", "a+")
+        writer.write(re+"\r\n")
+        writer.close()
     sv.stop 
