@@ -1,0 +1,2 @@
+model_checkpoint_path: "initialize_wb.ckpt"
+all_model_checkpoint_paths: "initialize_wb.ckpt"

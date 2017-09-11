@@ -4,7 +4,7 @@
 # $3 is the optimizer of model
 # $4 is the targted_accuracy of model
 # $5 is the tensorflow port
-# $6 is the filepath of result
+# $6 is the empoch
 # ps.sh run in ssd42
 
 get_ps_conf(){
@@ -60,7 +60,7 @@ do
 	    then
 		sleep 0.5
 	    fi
-	    ssh ssd$i python /root/code/disDNN/disDNN.py $ps $worker --job_name=worker --task_index=$index --targted_accuracy=$4 --optimizer=$3 >> /root/code/$index
+	    ssh ssd$i python /root/code/disDNN/disDNN.py $ps $worker --job_name=worker --task_index=$index --targted_accuracy=$4 --empoch=$6 --optimizer=$3 >> /root/code/$index
             echo "worker"$index" complated"
 	    echo "1">temp$index
 	fi

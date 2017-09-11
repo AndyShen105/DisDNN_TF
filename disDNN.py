@@ -26,7 +26,7 @@ def get_optimizer(optimizer, learning_rate):
     elif optimizer == "Momentum":
 	return  tf.train.MomentumOptimizer(learning_rate)
     elif optimizer == "RMSProp":
-	return  tf.train.RMSProp(learning_rate)
+	return  tf.train.RMSPropOptimizer(learning_rate)
 def conv2d(x, W):
   """conv2d returns a 2d convolution layer with full stride."""
   return tf.nn.conv2d(x, W, strides=[1, 1, 1, 1], padding='SAME')
@@ -61,6 +61,7 @@ tf.app.flags.DEFINE_string("job_name", "", "Either 'ps' or 'worker'")
 tf.app.flags.DEFINE_integer("task_index", 0, "Index of task within the job")
 tf.app.flags.DEFINE_float("targted_accuracy", 0.5, "targted accuracy of model")
 tf.app.flags.DEFINE_string("optimizer", "SGD", "optimizer we adopted")
+tf.app.flags.DEFINE_integer("empoch", "1", "empoch")
 FLAGS = tf.app.flags.FLAGS
 
 # start a server for a specific task
@@ -73,6 +74,7 @@ server = tf.train.Server(
 batch_size = 100
 learning_rate = 0.0001
 targted_accuracy = FLAGS.targted_accuracy
+empoch = FLAGS.empoch
 Optimizer = FLAGS.optimizer
 
 if FLAGS.job_name == "ps":
@@ -162,7 +164,7 @@ elif FLAGS.job_name == "worker":
     server_grpc_url = "grpc://" + workers[FLAGS.task_index]
     state = False
     with sv.prepare_or_wait_for_session(server_grpc_url, config=sess_config) as sess:
-	saver.restore(sess, "code/disDNN/savemodel/initialize_wb.ckpt")
+	saver.restore(sess, "/root/code/disDNN/savemodel/initialize_wb.ckpt")
 	while(not state):
             uninitalized_variables=sess.run(variables_check_op)
 	    if(len(uninitalized_variables.shape) == 1):
@@ -172,12 +174,12 @@ elif FLAGS.job_name == "worker":
 	cost = 0
 	final_accuracy = 0
 	begin_time = time.time()
-	while (not sv.should_stop()) and (step < 550):
+	while (not sv.should_stop()) and (step < 550 * empoch):
 	    batch_x, batch_y = mnist.train.next_batch(batch_size)
 	    _, cost, step = sess.run([train_op, cross_entropy, global_step], feed_dict={x: batch_x, y_: batch_y, keep_prob: 0.5})
 	    #final_accuracy = sess.run(accuracy, feed_dict = {x: mnist.test.images, y_: mnist.test.labels, keep_prob: 1.0})
 	    #if (final_accuracy > targted_accuracy):
-	    #	break
+	   #	break
 	    print("Step: %d," % (step+1), 
 			" Accuracy: %.4f," % final_accuracy,
 			" Loss: %f" % cost,
@@ -188,7 +190,7 @@ elif FLAGS.job_name == "worker":
 	    
 	final_accuracy = sess.run(accuracy, feed_dict = {x: mnist.test.images, y_: mnist.test.labels, keep_prob: 1.0})
 	re = str(n_PS) + '-' + str(n_Workers) + '-' + str(FLAGS.task_index) + ',' + str(step) + ',' + str(float(time.time()-start_time)) + ',' + str(cost) + ',' + str(final_accuracy)
-        writer = open("re_2_"+Optimizer+".csv", "a+")
+        writer = open("re_ep"+str(empoch)+"_"+Optimizer+".csv", "a+")
         writer.write(re+"\r\n")
         writer.close()
     sv.stop 
